@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DiscountShop Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    :root {
+      --tg-bg: #17212b;
+      --tg-surface: #1e2b39;
+      --tg-surface-2: #223245;
+      --tg-line: #2a3d52;
+      --tg-chip: #253646;
+      --tg-text: #f4f7fb;
+      --tg-muted: #9eb0c3;
+      --tg-blue: #43a9ff;
+      --tg-yellow: #facc15;
+    }
+
+    body {
+      background: #0d1620;
+      color: var(--tg-text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+
+    * {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    *::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+
+    .app-shell {
+      min-height: 100dvh;
+      background: var(--tg-bg);
+    }
+
+    .telegram-panel {
+      background: var(--tg-surface);
+      border: 1px solid var(--tg-line);
+    }
+
+    .chip {
+      background: var(--tg-chip);
+      color: #d7e4f1;
+    }
+
+    .chip.active {
+      background: #31475d;
+      color: #fff;
+    }
+
+    .product-image {
+      aspect-ratio: 3 / 4;
+      object-fit: cover;
+    }
+
+    .heart svg {
+      width: 24px;
+      height: 24px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .heart.active {
+      color: #ff4f7a;
+    }
+
+    .heart.active svg {
+      fill: #ff4f7a;
+      stroke: #ff4f7a;
+    }
+
+    .toast {
+      transform: translateY(120%);
+      opacity: 0;
+      transition: transform .25s ease, opacity .25s ease;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .fade-in {
+      animation: fadeIn .25s ease;
+    }
+
+    .sheet {
+      transform: translateY(100%);
+      transition: transform .28s ease;
+    }
+
+    .sheet.open {
+      transform: translateY(0);
+    }
+
+    .modal-pop {
+      opacity: 0;
+      transform: translate(-50%, -48%) scale(0.96);
+      transition: opacity .2s ease, transform .22s ease;
+      pointer-events: none;
+    }
+
+    .modal-pop.open {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+      pointer-events: auto;
+    }
+
+    .filter-row {
+      cursor: grab;
+      user-select: none;
+      touch-action: pan-y;
+    }
+
+    .filter-row.dragging {
+      cursor: grabbing;
+    }
+
+    .slider-track {
+      transition: transform .45s cubic-bezier(0.22, 0.61, 0.36, 1);
+      will-change: transform;
+    }
+
+
+    .kip-shimmer {
+      background: linear-gradient(110deg, #fde047 0%, #fff7bf 30%, #fde047 55%, #fff7bf 75%, #fde047 100%);
+      background-size: 220% 100%;
+      color: transparent;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: kipShimmer 2.1s linear infinite;
+      text-shadow: 0 0 10px rgba(253, 224, 71, 0.35);
+    }
+
+    .brand-shimmer {
+      background: linear-gradient(110deg, #facc15 0%, #ffe27a 28%, #fff7cf 52%, #ffd54f 76%, #facc15 100%);
+      background-size: 220% 100%;
+      color: transparent;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: brandShimmer 7.2s ease-in-out infinite;
+      font-weight: 800;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes kipShimmer {
+      from { background-position: 200% 0; }
+      to { background-position: -20% 0; }
+    }
+
+    @keyframes brandShimmer {
+      from { background-position: 220% 0; }
+      to { background-position: -20% 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell max-w-md mx-auto relative overflow-hidden">
+    <header class="px-4 pt-4 pb-3 border-b" style="border-color: var(--tg-line)">
+      <div id="topBar"></div>
+    </header>
+
+    <main id="view" class="pb-32"></main>
+
+    <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md border-t telegram-panel z-30">
+      <div class="grid grid-cols-4 text-xs">
+        <button data-tab="home" class="tab-btn py-3 flex flex-col items-center gap-1 text-[var(--tg-blue)]">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5L12 3l9 7.5"></path><path d="M5 9.8V20h14V9.8"></path></svg>
+          <span>Главная</span>
+        </button>
+        <button data-tab="favorites" class="tab-btn py-3 flex flex-col items-center gap-1 text-[var(--tg-muted)]">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20s-7-4.6-9-8.5C1.3 8.2 3.3 5 6.8 5c2.1 0 3.6 1.2 5.2 3.1C13.6 6.2 15.1 5 17.2 5 20.7 5 22.7 8.2 21 11.5 19 15.4 12 20 12 20z"></path></svg>
+          <span>Избранные</span>
+        </button>
+        <button data-tab="cart" class="tab-btn py-3 flex flex-col items-center gap-1 text-[var(--tg-muted)] relative">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8h12l-1 11H7L6 8z"></path><path d="M9 8a3 3 0 016 0"></path></svg>
+          <span>Корзина</span>
+          <span id="cartBadge" class="hidden absolute top-1 right-6 bg-red-500 text-white rounded-full min-w-5 h-5 text-[10px] grid place-items-center px-1">0</span>
+        </button>
+        <button data-tab="profile" class="tab-btn py-3 flex flex-col items-center gap-1 text-[var(--tg-muted)]">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.8-3.5 5-5 8-5s6.2 1.5 8 5"></path></svg>
+          <span>Профиль</span>
+        </button>
+      </div>
+    </nav>
+
+    <div id="toast" class="toast fixed bottom-[5.5rem] left-1/2 -translate-x-1/2 bg-slate-100 text-slate-900 text-sm px-4 py-2 rounded-lg font-medium z-[70]">
+      Товар успешно добавлен в избранные
+    </div>
+
+    <div id="sortOverlay" class="fixed inset-0 bg-black/55 hidden z-40"></div>
+    <aside id="sortSheet" class="sheet fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md telegram-panel rounded-t-2xl p-4 z-50">
+      <h3 class="text-lg font-semibold mb-3">Сортировать по</h3>
+      <div id="sortOptions" class="space-y-2"></div>
+      <div class="mt-4 flex gap-2">
+        <button id="cancelSort" class="flex-1 py-3 rounded-xl chip">Отмена</button>
+        <button id="applySort" class="flex-1 py-3 rounded-xl bg-[var(--tg-blue)] text-white">Применить</button>
+      </div>
+    </aside>
+
+    <div id="categoryOverlay" class="fixed inset-0 bg-black/55 hidden z-40"></div>
+    <aside id="categorySheet" class="sheet fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md telegram-panel rounded-t-2xl p-4 z-50">
+      <h3 class="text-lg font-semibold mb-3">Категории</h3>
+      <div id="categoryOptions" class="space-y-2"></div>
+      <div class="mt-4 flex gap-2">
+        <button id="cancelCategories" class="flex-1 py-3 rounded-xl chip">Отмена</button>
+        <button id="applyCategories" class="flex-1 py-3 rounded-xl bg-[var(--tg-blue)] text-white">Применить</button>
+      </div>
+    </aside>
+
+    <div id="checkoutOverlay" class="fixed inset-0 bg-black/55 hidden z-40"></div>
+    <aside id="checkoutSheet" class="modal-pop fixed top-1/2 left-1/2 w-[calc(100%-1.5rem)] max-w-md telegram-panel rounded-2xl p-4 z-50">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-semibold">Данные получателя</h3>
+        <button id="closeCheckout" class="text-slate-300">Закрыть</button>
+      </div>
+
+      <div class="space-y-3">
+        <label class="block telegram-panel rounded-xl p-3">
+          <div class="text-sm text-slate-300 mb-1">Имя</div>
+          <input id="receiverName" type="text" placeholder="Иван" class="w-full bg-transparent outline-none" />
+        </label>
+
+        <label class="block telegram-panel rounded-xl p-3">
+          <div class="text-sm text-slate-300 mb-1">Фамилия</div>
+          <input id="receiverSurname" type="text" placeholder="Иванов" class="w-full bg-transparent outline-none" />
+        </label>
+
+        <label class="block telegram-panel rounded-xl p-3">
+          <div class="text-sm text-slate-300 mb-1">Отчество</div>
+          <input id="receiverPatronymic" type="text" placeholder="Иванович" class="w-full bg-transparent outline-none" />
+        </label>
+
+        <label class="block telegram-panel rounded-xl p-3">
+          <div class="text-sm text-slate-300 mb-1">Номер телефона</div>
+          <input id="receiverPhone" type="tel" placeholder="+7 999 999 99 99" class="w-full bg-transparent outline-none" />
+        </label>
+
+        <label class="block telegram-panel rounded-xl p-3">
+          <div class="text-sm text-slate-300 mb-1">Адрес получателя</div>
+          <input id="receiverAddress" type="text" placeholder="г. Москва, Таганская улица, д.3" class="w-full bg-transparent outline-none" />
+        </label>
+
+        <label class="block telegram-panel rounded-xl p-3">
+          <div class="text-sm text-slate-300 mb-1">Индекс получателя</div>
+          <input id="receiverZip" type="text" placeholder="109147" class="w-full bg-transparent outline-none" />
+        </label>
+      </div>
+
+      <div id="checkoutMessage" class="text-sm mt-3 min-h-5"></div>
+      <button id="submitOrder" class="w-full mt-2 bg-[var(--tg-blue)] rounded-xl py-3 font-semibold">Оформить</button>
+    </aside>
+
+    <div id="successOverlay" class="fixed inset-0 bg-black/55 hidden z-[60]"></div>
+    <aside id="successModal" class="modal-pop fixed top-1/2 left-1/2 w-[calc(100%-2rem)] max-w-md telegram-panel rounded-2xl p-6 z-[70] text-center">
+      <div class="text-3xl font-bold mb-3">Готово!</div>
+      <p class="text-slate-200 text-lg mb-5">Наш менеджер свяжется с вами в течение часа.</p>
+      <button id="closeSuccess" class="w-full bg-[var(--tg-blue)] rounded-xl py-3 font-semibold">Закрыть</button>
+    </aside>
+  </div>
+
+  <script>
+    const products = [
+  {
+    id: 1,
+    name: 'Толстовка Carhartt Zip',
+    category: 'Одежда',
+    price: 7000,
+    oldPrice: 9000,
+    popularity: 95,
+    isNew: true,
+    size: 'L',
+    description: '-Цена: 7000p.🔥\n-Размер: M\n\nЗамеры:\n-Плечи: 56\n-Подмышки: 60\n-Рукав от плеча: 66\n-Длина по спине: 70\n\nV144',
+    images: [
+      './Carhartt Zip (1).jpg',
+      './Carhartt Zip (2).jpg',
+      './Carhartt Zip (3).jpg',
+      './Carhartt Zip (4).jpg',
+      './Carhartt Zip (5).jpg',
+      './Carhartt Zip (6).jpg'
+    ]
+  },
+
+  {
+    id: 2,
+    name: 'Худи Stone Island Zip Wool',
+    category: 'Куртки',
+    price: 24000,
+    oldPrice: null,
+    popularity: 97,
+    isNew: true,
+    size: 'XL',
+    description: '-Цена: 24000p.🔥\n-Размер: M\n\nЗамеры:\n-Плечи: 45\n-Подмышки: 53\n-Рукав от плеча: 69\n-Длина по спине: 68\n\nArt. 551550MA3\nAutumn / Winter 2011\n\nS234',
+    images: [
+      './Stone Island Zip Wool (1).jpg',
+      './Stone Island Zip Wool (2).jpg',
+      './Stone Island Zip Wool (3).jpg',
+      './Stone Island Zip Wool (4).jpg',
+      './Stone Island Zip Wool (5).jpg',
+      './Stone Island Zip Wool (6).jpg'
+    ]
+  },
+
+  {
+    id: 3,
+    name: 'Куртка Stone Island Trylon-R',
+    category: 'Куртки',
+    price: 40000,
+    oldPrice: null,
+    popularity: 99,
+    isNew: true,
+    size: 'L',
+    description: '-Цена: 40000p.🔥\n-Размер: L\n\nЗамеры:\n-Плечи: 44\n-Подмышки: 56\n-Рукав от плеча: 70\n-Длина по спине: 68\n\nArt. 52194303 / 1836\n\nS247',
+    images: [
+      './Stone Island Trylon-R (1).jpg',
+      './Stone Island Trylon-R (2).jpg',
+      './Stone Island Trylon-R (3).jpg',
+      './Stone Island Trylon-R (4).jpg',
+      './Stone Island Trylon-R (5).jpg',
+      './Stone Island Trylon-R (6).jpg',
+    ]
+  },
+
+
+  {
+    id: 4,
+    name: 'Штаны Black Yak Extreme Peak',
+    category: 'Штаны',
+    price: 4500,
+    oldPrice: null,
+    popularity: 90,
+    isNew: true,
+    size: 'S',
+    description: 'Цена: 4500p.🔥\n-Размер: S (30)\n\nЗамеры:\n-Полуобхват: 38\n-Посадка: 30\n-Длина: 95\n-Выход: 18\n\nV180',
+    images: [
+      './Штаны Black Yak Extreme Peak (1).jpg',
+      './Штаны Black Yak Extreme Peak (2).jpg',
+      './Штаны Black Yak Extreme Peak (3).jpg',
+      './Штаны Black Yak Extreme Peak (4).jpg',
+      './Штаны Black Yak Extreme Peak (5).jpg',
+      './Штаны Black Yak Extreme Peak (6).jpg'
+    ]
+  },
+
+
+  {
+    id: 5,
+    name: 'Штаны Cargo Zip Off',
+    category: 'Штаны',
+    price: 4500,
+    oldPrice: null,
+    popularity: 89,
+    isNew: true,
+    size: 'L ; XL ; XXL',
+    description: '-Цена: 4500p.🔥\n-Размер: L ; XL ; XXL\n\nЗамеры:\nL\n-Полуобхват: 42\n-Посадка:35\n-Длина: 105\n-Выход: 22\nXL\n-Полуобхват: 45\n-Посадка: 36\n-Длина: 107\n-Выход: 24\nXXL\n-Полуобхват: 48\n-Посадка:38\n-Длина: 110\n-Выход: 25\n\nN102',
+    images: [
+      './Cargo Zip Off (1).jpg',
+      './Cargo Zip Off (2).jpg',
+      './Cargo Zip Off (3).jpg',
+      './Cargo Zip Off (4).jpg',
+      './Cargo Zip Off (5).jpg',
+      './Cargo Zip Off (6).jpg'
+    ]
+  },
+
+  {
+    id: 6,
+    name: 'Пуховик The North Face Baltoro 700',
+    category: 'Пуховики',
+    price: 15000,
+    oldPrice: null,
+    popularity: 93,
+    isNew: true,
+    size: 'XXL',
+    description: '-Цена: 15000p.🔥\n-Размер: XXL (жен)\n\nЗамеры:\n-Плечи: 44\n-Подмышки: 58\n-Рукав от плеча: 60\n-Длина по спине: 70\n\nD596',
+    images: [
+      './The North Face Baltoro 700 (1).jpg',
+      './The North Face Baltoro 700 (2).jpg',
+      './The North Face Baltoro 700 (3).jpg',
+      './The North Face Baltoro 700 (4).jpg',
+      './The North Face Baltoro 700 (5).jpg',
+      './The North Face Baltoro 700 (6).jpg'
+      ]
+  },
+
+  {
+    id: 7,
+    name: 'Пуховик Black Yak Extreme Peak',
+    category: 'Пуховики',
+    price: 15000,
+    oldPrice: null,
+    popularity: 92,
+    isNew: true,
+    size: 'L-XL',
+    description: '-Цена: 15000p.🔥\n-Размер: L-XL жен\n\nЗамеры:\n-Плечи: -\n-Подмышки: 56\n-Рукав от плеча: 75\n-Длина по спине: 72\n\nD617',
+    images: [
+      './Пуховик Black Yak Extreme Peak жен (1).jpg',
+      './Пуховик Black Yak Extreme Peak жен (2).jpg',
+      './Пуховик Black Yak Extreme Peak жен (3).jpg',
+      './Пуховик Black Yak Extreme Peak жен (4).jpg',
+      './Пуховик Black Yak Extreme Peak жен (5).jpg',
+      '.Пуховик Black Yak Extreme Peak жен (6).jpg'
+    ]
+  },
+
+  {
+    id: 8,
+    name: 'Пуховик The North Face 800 HyVent',
+    category: 'Пуховики',
+    price: 25000,
+    oldPrice: null,
+    popularity: 96,
+    isNew: true,
+    size: 'M',
+    description: '-Цена: 25000p.🔥\n-Размер: M\n\nЗамеры:\n-Плечи: 52\n-Подмышки: 62\n-Рукав от плеча: 65\n-Длина по спине: 85\n\nD607',
+    images: [
+      './The North Face 800 HyVent (1).jpg',
+      './The North Face 800 HyVent (2).jpg',
+      './The North Face 800 HyVent (3).jpg',
+      './The North Face 800 HyVent (4).jpg',
+      './The North Face 800 HyVent (5).jpg',
+      './The North Face 800 HyVent (6).jpg'
+    ]
+  },
+
+  {
+    id: 9,
+    name: 'Пуховик Black Yak Extreme Peak',
+    category: 'Пуховики',
+    price: 20000,
+    oldPrice: null,
+    popularity: 91,
+    isNew: true,
+    size: 'XL',
+    description: '-Цена: 20000p.🔥\n-Размер: XL\n\nЗамеры:\n-Плечи: -\n-Подмышки: 62\n-Рукав от горла: 78\n-Длина по спине: 74\n\nD599',
+    images: [
+      './Пуховик Black Yak Extreme Peak ЖЕЛТ (1).jpg',
+      './Пуховик Black Yak Extreme Peak ЖЕЛТ (2).jpg',
+      './Пуховик Black Yak Extreme Peak ЖЕЛТ (3).jpg',
+      './Пуховик Black Yak Extreme Peak ЖЕЛТ (4).jpg',
+      './Пуховик Black Yak Extreme Peak ЖЕЛТ (5).jpg',
+      './Пуховик Black Yak Extreme Peak ЖЕЛТ (6).jpg'
+    ]
+  },
+
+  {
+    id: 10,
+    name: 'Пуховик Montbell',
+    category: 'Пуховики',
+    price: 16000,
+    oldPrice: null,
+    popularity: 90,
+    isNew: true,
+    size: 'L',
+    description: '-Цена: 16000p.🔥\n-Размер: L\n\nЗамеры:\n-Плечи: 48\n-Подмышки: 60\n-Рукав от плеча: 68\n-Длина по спине: 72\n\nD588',
+    images: [
+      './Пуховик Montbell (1).jpg',
+      './Пуховик Montbell (2).jpg',
+      './Пуховик Montbell (3).jpg',
+      './Пуховик Montbell (4).jpg',
+      './Пуховик Montbell (5).jpg',
+      './Пуховик Montbell (6).jpg'
+    ]
+  },
+
+  {
+    id: 11,
+    name: 'Пуховик Black Yak Extreme Peak',
+    category: 'Пуховики',
+    price: 18000,
+    oldPrice: null,
+    popularity: 89,
+    isNew: true,
+    size: 'L',
+    description: '-Цена: 18000p.🔥\n-Размер: L (100)\n\nЗамеры:\n-Плечи: 56\n-Подмышки: 60\n-Рукав от плеча: 65\n-Длина по спине: 75\n\nD586',
+    images: [
+      './Пуховик Black Yak Extreme Peak 2 (1).jpg',
+      './Пуховик Black Yak Extreme Peak 2 (2).jpg',
+      './Пуховик Black Yak Extreme Peak 2 (3).jpg',
+      './Пуховик Black Yak Extreme Peak 2 (4).jpg',
+      './Пуховик Black Yak Extreme Peak 2 (5).jpg',
+      './Пуховик Black Yak Extreme Peak 2 (6).jpg'
+    ]
+  },
+
+  {
+    id: 12,
+    name: 'Кофта The North Face',
+    category: 'Одежда',
+    price: 4500,
+    oldPrice: null,
+    popularity: 87,
+    isNew: true,
+    size: 'XL',
+    description: '-Цена: 4500p.🔥\n-Размер: XL\n\nЗамеры:\n-Плечи: 50\n-Подмышки: 56\n-Рукав от плеча: 65\n-Длина по спине: 68\n\nV212',
+    images: [
+      './Кофта The North Face (1).jpg',
+      './Кофта The North Face (2).jpg',
+      './Кофта The North Face (3).jpg',
+      './Кофта The North Face (4).jpg',
+      './Кофта The North Face (5).jpg',
+      './Кофта The North Face (6).jpg'
+    ]
+  },
+
+  {
+    id: 13,
+    name: 'Кофта Lacoste Sport Vintage',
+    category: 'Одежда',
+    price: 8500,
+    oldPrice: null,
+    popularity: 88,
+    isNew: true,
+    size: 'XL',
+    description: '-Цена: 8500p.🔥\n-Размер: XL\n\nЗамеры:\n-Плечи: 60\n-Подмышки: 65\n-Рукав от плеча: 70\n-Длина по спине: 70\n\nV57',
+    images: [
+      './Кофта Lacoste Sport Vintage (1).jpg',
+      './Кофта Lacoste Sport Vintage (2).jpg',
+      './Кофта Lacoste Sport Vintage (3).jpg',
+      './Кофта Lacoste Sport Vintage (4).jpg',
+      './Кофта Lacoste Sport Vintage (5).jpg',
+      './Кофта Lacoste Sport Vintage (6).jpg'
+    ]
+  }
+];
+    
+
+    const sortLabels = {
+      new: 'Новинки',
+      asc: 'По возрастанию цены',
+      desc: 'По убыванию',
+      popular: 'Популярные'
+    };
+
+    const categories = ['Пуховики', 'Куртки', 'Одежда', 'Штаны'];
+    const CATALOG_VISIBLE = true;
+
+    const state = {
+      tab: 'home',
+      previousTab: 'home',
+      profileScreen: 'main',
+      sort: 'new',
+      pendingSort: 'new',
+      category: 'Все',
+      pendingCategory: 'Все',
+      search: '',
+      searchHistory: [],
+      detailId: null,
+      detailSlide: 0,
+      favorites: new Set(),
+      cart: new Map(),
+      promo: { value: '', status: 'idle', applied: false },
+      orders: [],
+      recipient: {
+        name: '',
+        surname: '',
+        patronymic: '',
+        phone: '',
+        address: '',
+        zip: ''
+      },
+      user: { name: 'Telegram User', username: '@username', photo: '' }
+    };
+
+    let filterClickBlockUntil = 0;
+
+    const topBar = document.getElementById('topBar');
+    const view = document.getElementById('view');
+    const toast = document.getElementById('toast');
+    const cartBadge = document.getElementById('cartBadge');
+    const sortOverlay = document.getElementById('sortOverlay');
+    const sortSheet = document.getElementById('sortSheet');
+    const sortOptions = document.getElementById('sortOptions');
+    const categoryOverlay = document.getElementById('categoryOverlay');
+    const categorySheet = document.getElementById('categorySheet');
+    const categoryOptions = document.getElementById('categoryOptions');
+    const checkoutOverlay = document.getElementById('checkoutOverlay');
+    const checkoutSheet = document.getElementById('checkoutSheet');
+    const checkoutMessage = document.getElementById('checkoutMessage');
+    const successOverlay = document.getElementById('successOverlay');
+    const successModal = document.getElementById('successModal');
+
+    function formatPrice(value) {
+      return value.toLocaleString('ru-RU') + ' ₽';
+    }
+
+    function getCartItems() {
+      return [...state.cart.entries()]
+        .map(([id, qty]) => ({ product: getProductById(id), qty }))
+        .filter((item) => item.product);
+    }
+
+    function getCartPricing() {
+      const subtotal = getCartItems().reduce((sum, item) => sum + item.product.price * item.qty, 0);
+      const discount = state.promo.applied ? Math.round(subtotal * 0.15) : 0;
+      return { subtotal, discount, total: subtotal - discount };
+    }
+
+    function saveSearchHistory() {
+      localStorage.setItem('discountshop_search_history', JSON.stringify(state.searchHistory));
+    }
+
+    function loadSearchHistory() {
+      try {
+        const raw = localStorage.getItem('discountshop_search_history');
+        const parsed = raw ? JSON.parse(raw) : [];
+        state.searchHistory = Array.isArray(parsed) ? parsed.slice(0, 8) : [];
+      } catch (_) {
+        state.searchHistory = [];
+      }
+    }
+
+    function addSearchHistory(query) {
+      const value = query.trim();
+      if (!value) return;
+      state.searchHistory = [value, ...state.searchHistory.filter((item) => item.toLowerCase() !== value.toLowerCase())].slice(0, 8);
+      saveSearchHistory();
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function sanitizeName(value) {
+      return value.replace(/\d+/g, '').replace(/[^A-Za-zА-Яа-яЁё\s-]/g, '');
+    }
+
+    function formatPhone(value) {
+      const digits = value.replace(/\D/g, '');
+      if (!digits.length) return '';
+      let normalized = digits;
+      if (normalized.startsWith('8')) normalized = '7' + normalized.slice(1);
+      if (!normalized.startsWith('7')) normalized = '7' + normalized;
+      normalized = normalized.slice(0, 11);
+      const local = normalized.slice(1);
+      const p1 = local.slice(0, 3);
+      const p2 = local.slice(3, 6);
+      const p3 = local.slice(6, 8);
+      const p4 = local.slice(8, 10);
+      let result = '+7';
+      if (p1) result += ' ' + p1;
+      if (p2) result += ' ' + p2;
+      if (p3) result += ' ' + p3;
+      if (p4) result += ' ' + p4;
+      return result;
+    }
+
+    async function copyPromoCode() {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText('KIP');
+        } else {
+          const temp = document.createElement('textarea');
+          temp.value = 'KIP';
+          temp.style.position = 'fixed';
+          temp.style.opacity = '0';
+          document.body.appendChild(temp);
+          temp.focus();
+          temp.select();
+          document.execCommand('copy');
+          document.body.removeChild(temp);
+        }
+        showToast('Промокод успешно скопирован!');
+      } catch (_) {
+        showToast('Не удалось скопировать промокод');
+      }
+    }
+
+    function getProductById(id) {
+      return products.find((item) => item.id === id) || null;
+    }
+
+    function getCartCount() {
+      let count = 0;
+      for (const qty of state.cart.values()) count += qty;
+      return count;
+    }
+
+    function getFilteredProducts() {
+      let list = [...products];
+
+      if (state.category !== 'Все') {
+        list = list.filter((item) => item.category === state.category);
+      }
+      if (state.search.trim()) {
+        const q = state.search.trim().toLowerCase();
+        list = list.filter((item) => item.name.toLowerCase().includes(q));
+      }
+
+      if (state.sort === 'asc') list.sort((a, b) => a.price - b.price);
+      if (state.sort === 'desc') list.sort((a, b) => b.price - a.price);
+      if (state.sort === 'popular') list.sort((a, b) => b.popularity - a.popularity);
+      if (state.sort === 'new') list.sort((a, b) => Number(b.isNew) - Number(a.isNew));
+
+      return list;
+    }
+
+    function renderTopBar() {
+      if (state.tab === 'product') {
+        topBar.innerHTML = `
+          <div class="flex items-center gap-3">
+            <button id="backToList" class="text-slate-300" aria-label="Назад">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"></path></svg>
+            </button>
+            <div class="font-bold text-2xl">
+              <span class="brand-shimmer">DiscountShop</span>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      topBar.innerHTML = `
+        <div class="flex items-center gap-3">
+          <h1 class="font-extrabold text-xl tracking-tight whitespace-nowrap">
+            <span class="brand-shimmer">DiscountShop</span>
+          </h1>
+          <label class="telegram-panel flex-1 rounded-xl px-3 py-2 flex items-center gap-2">
+            <svg class="w-4 h-4 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input id="searchInput" type="text" placeholder="Поиск" class="w-full bg-transparent text-sm outline-none placeholder:text-slate-400" />
+          </label>
+        </div>
+      `;
+    }
+
+    function renderPromo() {
+      return `
+        <button id="copyPromoBtn" class="w-full text-left rounded-2xl px-4 py-3 mb-3 border border-sky-300/20 bg-gradient-to-r from-[#24517d] via-[#3177b6] to-[#4da7ff] shadow-[0_10px_30px_rgba(35,121,197,0.28)]">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-sm text-sky-100/90">Спецпредложение 🎉</div>
+              <div class="font-extrabold text-white leading-tight">-15% на первый заказ</div>
+            </div>
+            <div class="chip rounded-lg px-3 py-1.5 text-xs font-bold"><span class="kip-shimmer">KIP</span></div>
+          </div>
+        </button>
+      `;
+    }
+
+    function renderProductCard(item) {
+      return `
+        <article data-open="${item.id}" class="fade-in cursor-pointer">
+          <div class="relative">
+            <img src="${item.images[0]}" alt="${item.name}" class="product-image w-full rounded-xl" />
+            <button data-fav="${item.id}" class="heart absolute top-2 right-2 ${state.favorites.has(item.id) ? 'active' : 'text-white/85'}">
+              <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.6-9-8.5C1.3 8.2 3.3 5 6.8 5c2.1 0 3.6 1.2 5.2 3.1C13.6 6.2 15.1 5 17.2 5 20.7 5 22.7 8.2 21 11.5 19 15.4 12 20 12 20z"></path></svg>
+            </button>
+          </div>
+          <div class="mt-1.5">
+            <div class="flex items-center gap-2">
+              <div class="font-extrabold text-xl leading-none ${item.oldPrice ? 'text-red-400' : ''}">${formatPrice(item.price)}</div>
+              ${item.oldPrice ? '<span class="text-[11px] px-2 py-0.5 rounded-md bg-red-500/20 text-red-300 font-bold">Sale!</span>' : ''}
+            </div>
+            ${item.oldPrice ? `<div class="text-slate-300 line-through text-sm mt-0.5 font-semibold">${formatPrice(item.oldPrice)}</div>` : ''}
+            <div class="text-[15px] leading-5 mt-1">${item.name}</div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderHome() {
+      const list = CATALOG_VISIBLE ? getFilteredProducts() : [];
+      return `
+        <section class="p-3 fade-in">
+          ${renderPromo()}
+          <div id="filterRow" class="filter-row flex items-center gap-2 mb-3 overflow-x-auto pb-1">
+            <button id="sortBtn" class="chip rounded-full px-4 py-2 text-sm whitespace-nowrap">Сортировать: ${sortLabels[state.sort]}</button>
+            <button id="openCategories" class="chip rounded-full px-4 py-2 text-sm whitespace-nowrap">${state.category === 'Все' ? 'Категории' : `Категория: ${state.category}`}</button>
+            ${categories.map((cat) => `<button data-cat="${cat}" class="chip category-quick rounded-full px-4 py-2 text-sm whitespace-nowrap ${state.category === cat ? 'active' : ''}">${cat}</button>`).join('')}
+          </div>
+
+          ${state.searchHistory.length ? `
+            <div class="mb-3 telegram-panel rounded-xl p-3">
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-sm text-slate-300">История поиска</div>
+                <button data-clear-history class="text-xs text-[var(--tg-blue)]">Очистить</button>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                ${state.searchHistory.map((item) => `<button data-history-query="${escapeHtml(item)}" class="chip rounded-full px-3 py-1.5 text-xs">${escapeHtml(item)}</button>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${CATALOG_VISIBLE
+            ? `<div class="grid grid-cols-2 gap-3">${list.map(renderProductCard).join('')}</div><div class="w-full text-center text-slate-400 text-sm mt-12">Скоро новые поступления!</div>`
+            : '<div class="telegram-panel rounded-xl p-4 text-center text-slate-300">Карточки товаров временно скрыты</div>'}
+        </section>
+      `;
+    }
+
+    function renderFavorites() {
+      const items = products.filter((p) => state.favorites.has(p.id));
+      if (!items.length) {
+        return `
+          <section class="px-6 pt-12 text-center fade-in">
+            <img src="./images/Без названия-Photoroom.png" class="w-32 mx-auto mb-4" />
+            <h2 class="text-4xl font-bold mb-3">В избранном пусто</h2>
+            <p class="text-xl text-slate-300 mb-5">Добавляйте понравившиеся товары в избранное, чтобы не потерять</p>
+            <button id="goHomeFav" class="bg-[var(--tg-blue)] rounded-xl px-6 py-3 text-white font-semibold">Вернуться к покупкам</button>
+          </section>
+        `;
+      }
+      return `<section class="p-3 fade-in"><div class="grid grid-cols-2 gap-3">${items.map(renderProductCard).join('')}</div></section>`;
+    }
+
+    function renderCart() {
+      const entries = getCartItems();
+      if (!entries.length) {
+        return `
+          <section class="px-6 pt-12 text-center fade-in">
+            <img src="./images/Без названия-Photoroom.png" class="w-32 mx-auto mb-4" />
+            <h2 class="text-4xl font-bold mb-3">В корзине пусто</h2>
+            <p class="text-xl text-slate-300 mb-5">Посмотрите каталог и добавьте товары в корзину</p>
+            <button id="goHomeCart" class="bg-[var(--tg-blue)] rounded-xl px-6 py-3 text-white font-semibold">Вернуться к покупкам</button>
+          </section>
+        `;
+      }
+
+      const { subtotal, discount, total } = getCartPricing();
+      const promoBorder = state.promo.status === 'success'
+        ? 'border-emerald-400'
+        : state.promo.status === 'error'
+          ? 'border-red-400'
+          : 'border-[var(--tg-line)]';
+
+      return `
+        <section class="fade-in">
+          <div class="p-4 flex items-center justify-between">
+            <h2 class="text-4xl font-bold">Корзина</h2>
+            <button id="clearCart" class="text-[var(--tg-blue)] text-lg">Очистить</button>
+          </div>
+          <div class="space-y-3 px-3">
+            ${entries.map(({ product, qty }) => `
+              <div class="telegram-panel rounded-xl p-3">
+                <div class="flex gap-3">
+                  <img src="${product.images[0]}" alt="${product.name}" class="w-20 h-20 rounded-lg object-cover" />
+                  <div class="flex-1">
+                    <div class="text-lg mb-2">${product.name}</div>
+                    <div class="flex items-center justify-between">
+                      <div class="chip rounded-xl px-3 py-2 flex items-center gap-3">
+                        <button data-minus="${product.id}" class="text-xl">−</button>
+                        <span class="w-5 text-center">${qty}</span>
+                        <button data-plus="${product.id}" class="text-xl">+</button>
+                      </div>
+                      <div class="font-bold text-2xl">${formatPrice(product.price * qty)}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="px-3 mt-4">
+            <div class="flex gap-2 items-start">
+              <input id="promoInput" placeholder="Промокод" class="flex-1 rounded-xl px-4 py-3 bg-transparent outline-none border ${promoBorder}" />
+              <button id="applyPromo" class="chip rounded-xl px-4 py-3 text-sm">Применить</button>
+            </div>
+            ${state.promo.status === 'success'
+              ? '<div class="text-emerald-400 text-sm mt-2">Успешно!</div>'
+              : state.promo.status === 'error'
+                ? '<div class="text-red-400 text-sm mt-2">Такого промокода несуществует!</div>'
+                : ''}
+            <div class="mt-3 text-lg flex justify-between"><span>Товары (${getCartCount()})</span><span>${formatPrice(subtotal)}</span></div>
+            ${discount > 0 ? `<div class="mt-1 text-lg flex justify-between text-emerald-400"><span>Скидка (KIP)</span><span>-${formatPrice(discount)}</span></div>` : ''}
+            <div class="mt-2 text-2xl font-bold flex justify-between"><span>Итого</span><span>${formatPrice(total)}</span></div>
+          </div>
+          <div class="p-3 mt-4 border-t" style="border-color: var(--tg-line)">
+            <button id="checkoutBtn" class="w-full bg-[var(--tg-blue)] rounded-2xl py-4 text-xl font-semibold">Оформить</button>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderProfile() {
+      const initials = state.user.name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+      const avatar = state.user.photo
+        ? `<img src="${state.user.photo}" alt="avatar" class="w-24 h-24 rounded-full object-cover border border-slate-500" />`
+        : `<div class="w-24 h-24 rounded-full bg-[var(--tg-surface-2)] grid place-items-center text-3xl font-bold">${initials || 'TG'}</div>`;
+
+      if (state.profileScreen === 'orders') {
+        return `
+          <section class="fade-in p-3">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-3xl font-bold">История заказов</h2>
+              <button id="profileBack" class="text-[var(--tg-blue)]">Назад</button>
+            </div>
+            <div class="space-y-2">
+              ${state.orders.length ? state.orders.map((order) => `
+                <div class="telegram-panel rounded-xl p-3">
+                  <div class="text-sm text-slate-300 mb-1">${new Date(order.createdAt).toLocaleString('ru-RU')}</div>
+                  <div class="text-lg mb-1">${order.items.map((item) => `${item.name} x${item.qty}`).join(', ')}</div>
+                  <div class="text-sm text-slate-300">${order.recipient?.fullName || ''}</div>
+                  <div class="text-sm text-slate-300">${order.recipient?.address || ''}</div>
+                  <div class="text-sm text-slate-300 mb-1">Индекс: ${order.recipient?.zip || ''}</div>
+                  <div class="text-sm text-amber-300 mb-1">Обработка заказа...</div>
+                  <div class="font-semibold">Сумма: ${formatPrice(order.total)}</div>
+                </div>
+              `).join('') : '<div class="telegram-panel rounded-xl p-4 text-slate-300">Заказов пока нет</div>'}
+            </div>
+          </section>
+        `;
+      }
+
+      return `
+        <section class="fade-in">
+          <div class="h-56 bg-[var(--tg-surface-2)] flex flex-col items-center justify-center gap-3">
+            ${avatar}
+            <div class="text-3xl font-bold">${state.user.name}</div>
+            <div class="text-slate-300 text-lg">${state.user.username}</div>
+          </div>
+          <div class="p-3 space-y-2">
+            <button id="historyBtn" class="w-full telegram-panel rounded-xl px-4 py-4 text-left text-xl">История заказов</button>
+            <button id="supportBtn" class="w-full telegram-panel rounded-xl px-4 py-4 text-left text-xl">Связаться с поддержкой</button>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderProduct() {
+      const product = getProductById(state.detailId);
+      if (!product) {
+        state.tab = 'home';
+        return renderHome();
+      }
+
+      const maxIndex = product.images.length - 1;
+      if (state.detailSlide > maxIndex) state.detailSlide = maxIndex;
+
+      return `
+        <section class="fade-in">
+          <div class="relative overflow-hidden">
+            <div id="sliderTrack" class="slider-track flex" style="transform: translateX(-${state.detailSlide * 100}%);">
+              ${product.images.map((image) => `<img src="${image}" alt="${product.name}" class="w-full shrink-0 h-72 object-contain bg-[#111a24]" />`).join('')}
+            </div>
+            <button id="prevSlide" class="absolute top-1/2 left-2 -translate-y-1/2 chip w-9 h-9 rounded-full grid place-items-center">‹</button>
+            <button id="nextSlide" class="absolute top-1/2 right-2 -translate-y-1/2 chip w-9 h-9 rounded-full grid place-items-center">›</button>
+            <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+              ${product.images.map((_, index) => `<button data-dot="${index}" class="w-2.5 h-2.5 rounded-full ${state.detailSlide === index ? 'bg-white' : 'bg-white/40'}"></button>`).join('')}
+            </div>
+          </div>
+
+          <div class="p-3 border-t" style="border-color: var(--tg-line)">
+            <h2 class="text-[30px] font-bold leading-tight">${product.name}</h2>
+            <div class="mt-1.5 flex items-end gap-2">
+              <div class="text-3xl font-bold ${product.oldPrice ? 'text-red-400' : ''}">${formatPrice(product.price)}</div>
+              ${product.oldPrice ? `<div class="text-lg text-slate-400 line-through">${formatPrice(product.oldPrice)}</div>` : ''}
+              ${product.oldPrice ? '<span class="text-xs px-2 py-1 rounded-md bg-red-500/20 text-red-300 font-bold">Sale!</span>' : ''}
+            </div>
+            <div class="mt-3">
+              <div class="text-xl font-bold mb-1.5">Описание товара</div>
+              <p class="text-base text-slate-200 mt-1 whitespace-pre-line italic">${product.description}</p>
+            </div>
+            <div class="mt-5 pt-4 border-t" style="border-color: var(--tg-line)">
+              <h3 class="text-2xl font-bold mb-3 text-center">Остались вопросы?</h3>
+              <button class="w-full chip rounded-2xl py-3 text-base font-semibold mb-3">Написать в поддержку</button>
+              <button data-add-detail="${product.id}" class="w-full bg-[var(--tg-blue)] rounded-2xl py-3 text-lg font-semibold">Добавить в корзину</button>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove('show'), 1700);
+    }
+
+    function render() {
+      const activeElement = document.activeElement;
+      const preserveSearchFocus = activeElement && activeElement.id === 'searchInput';
+      const searchCaret = preserveSearchFocus ? activeElement.selectionStart : null;
+
+      renderTopBar();
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) searchInput.value = state.search;
+      const renderMap = {
+        home: renderHome,
+        favorites: renderFavorites,
+        cart: renderCart,
+        profile: renderProfile,
+        product: renderProduct
+      };
+      view.innerHTML = renderMap[state.tab]();
+
+      const visibleTab = state.tab === 'product' ? state.previousTab : state.tab;
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.style.color = btn.dataset.tab === visibleTab ? 'var(--tg-blue)' : 'var(--tg-muted)';
+      });
+
+      const count = getCartCount();
+      cartBadge.textContent = count;
+      cartBadge.classList.toggle('hidden', count === 0);
+
+      bindDynamicEvents();
+
+      // Keep typing smooth: after rerender return focus/caret to search input.
+      if (preserveSearchFocus && state.tab !== 'product') {
+        const nextSearchInput = document.getElementById('searchInput');
+        if (nextSearchInput) {
+          nextSearchInput.focus();
+          const pos = Math.min(searchCaret ?? state.search.length, state.search.length);
+          nextSearchInput.setSelectionRange(pos, pos);
+        }
+      }
+    }
+
+    function openSortSheet() {
+      state.pendingSort = state.sort;
+      renderSortOptions();
+      sortOverlay.classList.remove('hidden');
+      requestAnimationFrame(() => sortSheet.classList.add('open'));
+    }
+
+    function closeSortSheet() {
+      sortSheet.classList.remove('open');
+      setTimeout(() => sortOverlay.classList.add('hidden'), 180);
+    }
+
+    function renderSortOptions() {
+      sortOptions.innerHTML = Object.entries(sortLabels).map(([key, label]) => `
+        <button data-sheet-sort="${key}" class="w-full text-left px-3 py-3 rounded-xl ${state.pendingSort === key ? 'bg-[var(--tg-surface-2)] text-white' : 'text-slate-300'}">${label}</button>
+      `).join('');
+    }
+
+    function openCategorySheet() {
+      state.pendingCategory = state.category;
+      renderCategoryOptions();
+      categoryOverlay.classList.remove('hidden');
+      requestAnimationFrame(() => categorySheet.classList.add('open'));
+    }
+
+    function closeCategorySheet() {
+      categorySheet.classList.remove('open');
+      setTimeout(() => categoryOverlay.classList.add('hidden'), 180);
+    }
+
+    function syncRecipientInputs() {
+      const fields = [
+        ['receiverName', 'name'],
+        ['receiverSurname', 'surname'],
+        ['receiverPatronymic', 'patronymic'],
+        ['receiverPhone', 'phone'],
+        ['receiverAddress', 'address'],
+        ['receiverZip', 'zip']
+      ];
+
+      fields.forEach(([id, key]) => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.value = state.recipient[key] || '';
+      });
+    }
+
+    function openCheckoutSheet() {
+      checkoutOverlay.classList.remove('hidden');
+      requestAnimationFrame(() => checkoutSheet.classList.add('open'));
+      checkoutMessage.textContent = '';
+      checkoutMessage.className = 'text-sm mt-3 min-h-5';
+      syncRecipientInputs();
+    }
+
+    function closeCheckoutSheet() {
+      checkoutSheet.classList.remove('open');
+      setTimeout(() => checkoutOverlay.classList.add('hidden'), 180);
+    }
+
+    function openSupportChat() {
+      const supportUrl = 'https://t.me/silentiumxx';
+      if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.openTelegramLink(supportUrl);
+        setTimeout(() => tg.close(), 150);
+        return;
+      }
+      window.location.href = supportUrl;
+    }
+
+    function openSuccessModal() {
+      successOverlay.classList.remove('hidden');
+      requestAnimationFrame(() => successModal.classList.add('open'));
+    }
+
+    function closeSuccessModal() {
+      successModal.classList.remove('open');
+      setTimeout(() => successOverlay.classList.add('hidden'), 180);
+    }
+
+    function renderCategoryOptions() {
+      categoryOptions.innerHTML = ['Все', ...categories].map((cat) => `
+        <button data-sheet-cat="${cat}" class="w-full text-left px-3 py-3 rounded-xl ${state.pendingCategory === cat ? 'bg-[var(--tg-surface-2)] text-white' : 'text-slate-300'}">${cat}</button>
+      `).join('');
+    }
+
+    function openProduct(id) {
+      state.previousTab = state.tab === 'product' ? state.previousTab : state.tab;
+      state.tab = 'product';
+      state.detailId = id;
+      state.detailSlide = 0;
+      render();
+    }
+
+    function setupFilterRowDrag() {
+      const row = document.getElementById('filterRow');
+      if (!row) return;
+
+      let pressed = false;
+      let dragging = false;
+      let startX = 0;
+      let startY = 0;
+      let startScroll = 0;
+      let movedAt = 0;
+
+      row.addEventListener('pointerdown', (event) => {
+        pressed = true;
+        dragging = false;
+        startX = event.clientX;
+        startY = event.clientY;
+        startScroll = row.scrollLeft;
+      });
+
+      row.addEventListener('pointermove', (event) => {
+        if (!pressed) return;
+        const deltaX = event.clientX - startX;
+        const deltaY = event.clientY - startY;
+        if (!dragging && Math.abs(deltaX) > 14 && Math.abs(deltaX) > Math.abs(deltaY)) {
+          dragging = true;
+        }
+        if (dragging) {
+          row.classList.add('dragging');
+          row.scrollLeft = startScroll - deltaX;
+          movedAt = Date.now();
+          event.preventDefault();
+        }
+      });
+
+      const stopDrag = () => {
+        if (dragging) filterClickBlockUntil = movedAt + 180;
+        pressed = false;
+        dragging = false;
+        row.classList.remove('dragging');
+      };
+
+      row.addEventListener('pointerup', stopDrag);
+      row.addEventListener('pointercancel', stopDrag);
+
+      row.addEventListener('click', (event) => {
+        if (Date.now() < filterClickBlockUntil) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+    }
+
+    function bindDynamicEvents() {
+      const searchInputEl = document.getElementById('searchInput');
+      if (searchInputEl && !searchInputEl.dataset.bound) {
+        searchInputEl.dataset.bound = '1';
+        searchInputEl.addEventListener('input', (event) => {
+          state.search = event.target.value;
+          if (state.tab !== 'home') {
+            state.tab = 'home';
+            render();
+            return;
+          }
+
+          // Update only catalog content while typing to avoid input glitches.
+          view.innerHTML = renderHome();
+          bindDynamicEvents();
+        });
+
+        searchInputEl.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter') return;
+          addSearchHistory(event.target.value);
+          render();
+        });
+
+        searchInputEl.addEventListener('blur', (event) => {
+          addSearchHistory(event.target.value);
+        });
+      }
+
+      document.querySelectorAll('[data-history-query]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.search = btn.dataset.historyQuery;
+          render();
+        });
+      });
+
+      document.querySelector('[data-clear-history]')?.addEventListener('click', () => {
+        state.searchHistory = [];
+        saveSearchHistory();
+        render();
+      });
+
+      document.getElementById('backToList')?.addEventListener('click', () => {
+        state.tab = state.previousTab || 'home';
+        render();
+      });
+
+      document.getElementById('copyPromoBtn')?.addEventListener('click', copyPromoCode);
+
+      document.getElementById('sortBtn')?.addEventListener('click', openSortSheet);
+      document.getElementById('openCategories')?.addEventListener('click', openCategorySheet);
+
+      document.querySelectorAll('[data-cat]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.category = btn.dataset.cat;
+          render();
+        });
+      });
+
+      document.querySelectorAll('[data-open]').forEach((card) => {
+        card.addEventListener('click', () => openProduct(Number(card.dataset.open)));
+      });
+
+      document.querySelectorAll('[data-fav]').forEach((btn) => {
+        btn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const id = Number(btn.dataset.fav);
+          if (state.favorites.has(id)) {
+            state.favorites.delete(id);
+            showToast('Товар удален из избранных');
+          } else {
+            state.favorites.add(id);
+            showToast('Товар успешно добавлен в избранные');
+          }
+          render();
+        });
+      });
+
+      document.querySelectorAll('[data-add]').forEach((btn) => {
+        btn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const id = Number(btn.dataset.add);
+          state.cart.set(id, (state.cart.get(id) || 0) + 1);
+          showToast('Товар добавлен в корзину');
+          render();
+        });
+      });
+
+      document.getElementById('goHomeFav')?.addEventListener('click', () => {
+        state.tab = 'home';
+        render();
+      });
+
+      document.getElementById('goHomeCart')?.addEventListener('click', () => {
+        state.tab = 'home';
+        render();
+      });
+
+      document.getElementById('historyBtn')?.addEventListener('click', () => {
+        state.profileScreen = 'orders';
+        render();
+      });
+
+      document.getElementById('supportBtn')?.addEventListener('click', openSupportChat);
+
+      document.getElementById('profileBack')?.addEventListener('click', () => {
+        state.profileScreen = 'main';
+        render();
+      });
+
+      document.getElementById('clearCart')?.addEventListener('click', () => {
+        state.cart.clear();
+        showToast('Корзина очищена');
+        render();
+      });
+
+      document.getElementById('checkoutBtn')?.addEventListener('click', openCheckoutSheet);
+
+      document.querySelectorAll('[data-plus]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.dataset.plus);
+          state.cart.set(id, (state.cart.get(id) || 0) + 1);
+          render();
+        });
+      });
+
+      document.querySelectorAll('[data-minus]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.dataset.minus);
+          const next = (state.cart.get(id) || 0) - 1;
+          if (next <= 0) {
+            state.cart.delete(id);
+            showToast('Товар был удален из корзины');
+          } else {
+            state.cart.set(id, next);
+          }
+          render();
+        });
+      });
+
+      const promoInput = document.getElementById('promoInput');
+      if (promoInput) {
+        promoInput.value = state.promo.value;
+        promoInput.addEventListener('input', (event) => {
+          state.promo.value = event.target.value;
+          state.promo.status = 'idle';
+          state.promo.applied = false;
+        });
+      }
+
+      document.getElementById('applyPromo')?.addEventListener('click', () => {
+        const code = state.promo.value.trim();
+        if (code === 'KIP') {
+          state.promo.applied = true;
+          state.promo.status = 'success';
+        } else {
+          state.promo.applied = false;
+          state.promo.status = 'error';
+        }
+        render();
+      });
+
+      document.getElementById('prevSlide')?.addEventListener('click', () => {
+        const product = getProductById(state.detailId);
+        if (!product) return;
+        state.detailSlide = (state.detailSlide - 1 + product.images.length) % product.images.length;
+        render();
+      });
+
+      document.getElementById('nextSlide')?.addEventListener('click', () => {
+        const product = getProductById(state.detailId);
+        if (!product) return;
+        state.detailSlide = (state.detailSlide + 1) % product.images.length;
+        render();
+      });
+
+      document.querySelectorAll('[data-dot]').forEach((dot) => {
+        dot.addEventListener('click', () => {
+          state.detailSlide = Number(dot.dataset.dot);
+          render();
+        });
+      });
+
+      const addDetailBtn = document.querySelector('[data-add-detail]');
+      addDetailBtn?.addEventListener('click', () => {
+        const id = Number(addDetailBtn.dataset.addDetail);
+        state.cart.set(id, (state.cart.get(id) || 0) + 1);
+        showToast('Товар добавлен в корзину');
+        render();
+      });
+
+      const sliderTrack = document.getElementById('sliderTrack');
+      if (sliderTrack) {
+        let startX = 0;
+        sliderTrack.addEventListener('touchstart', (event) => {
+          startX = event.touches[0].clientX;
+        }, { passive: true });
+        sliderTrack.addEventListener('touchend', (event) => {
+          const product = getProductById(state.detailId);
+          if (!product) return;
+          const delta = event.changedTouches[0].clientX - startX;
+          if (Math.abs(delta) < 35) return;
+          if (delta < 0) state.detailSlide = (state.detailSlide + 1) % product.images.length;
+          else state.detailSlide = (state.detailSlide - 1 + product.images.length) % product.images.length;
+          render();
+        }, { passive: true });
+      }
+
+      [
+        ['receiverName', 'name'],
+        ['receiverSurname', 'surname'],
+        ['receiverPatronymic', 'patronymic']
+      ].forEach(([id, key]) => {
+        const input = document.getElementById(id);
+        if (!input || input.dataset.bound) return;
+        input.dataset.bound = '1';
+        input.addEventListener('input', (event) => {
+          const clean = sanitizeName(event.target.value);
+          event.target.value = clean;
+          state.recipient[key] = clean;
+          checkoutMessage.textContent = '';
+        });
+      });
+
+      const phoneInput = document.getElementById('receiverPhone');
+      if (phoneInput && !phoneInput.dataset.bound) {
+        phoneInput.dataset.bound = '1';
+        phoneInput.addEventListener('input', (event) => {
+          const formatted = formatPhone(event.target.value);
+          event.target.value = formatted;
+          state.recipient.phone = formatted;
+          checkoutMessage.textContent = '';
+        });
+      }
+
+      const addressInput = document.getElementById('receiverAddress');
+      if (addressInput && !addressInput.dataset.bound) {
+        addressInput.dataset.bound = '1';
+        addressInput.addEventListener('input', (event) => {
+          state.recipient.address = event.target.value;
+          checkoutMessage.textContent = '';
+        });
+      }
+
+      const zipInput = document.getElementById('receiverZip');
+      if (zipInput && !zipInput.dataset.bound) {
+        zipInput.dataset.bound = '1';
+        zipInput.addEventListener('input', (event) => {
+          const clean = event.target.value.replace(/\D/g, '').slice(0, 6);
+          event.target.value = clean;
+          state.recipient.zip = clean;
+          checkoutMessage.textContent = '';
+        });
+      }
+
+      const submitOrderBtn = document.getElementById('submitOrder');
+      if (submitOrderBtn && !submitOrderBtn.dataset.bound) {
+        submitOrderBtn.dataset.bound = '1';
+        submitOrderBtn.addEventListener('click', () => {
+        const { name, surname, patronymic, phone, address, zip } = state.recipient;
+        const fioRegex = /^[A-Za-zА-Яа-яЁё\s-]+$/;
+        const phoneRegex = /^\+7\s\d{3}\s\d{3}\s\d{2}\s\d{2}$/;
+        const zipRegex = /^\d{6}$/;
+
+        if (!name.trim() || !surname.trim() || !patronymic.trim() || !fioRegex.test(name) || !fioRegex.test(surname) || !fioRegex.test(patronymic)) {
+          checkoutMessage.textContent = 'Проверьте ФИО: только буквы без цифр.';
+          checkoutMessage.className = 'text-sm mt-3 min-h-5 text-red-400';
+          return;
+        }
+        if (!phoneRegex.test(phone)) {
+          checkoutMessage.textContent = 'Проверьте номер телефона: формат +7 999 999 99 99.';
+          checkoutMessage.className = 'text-sm mt-3 min-h-5 text-red-400';
+          return;
+        }
+        if (!address.trim()) {
+          checkoutMessage.textContent = 'Введите адрес получателя.';
+          checkoutMessage.className = 'text-sm mt-3 min-h-5 text-red-400';
+          return;
+        }
+        if (!zipRegex.test(zip)) {
+          checkoutMessage.textContent = 'Индекс должен содержать ровно 6 цифр.';
+          checkoutMessage.className = 'text-sm mt-3 min-h-5 text-red-400';
+          return;
+        }
+
+        const pricing = getCartPricing();
+        const orderItems = getCartItems().map((item) => ({
+          name: item.product.name,
+          qty: item.qty
+        }));
+        state.orders.unshift({
+          createdAt: new Date().toISOString(),
+          items: orderItems,
+          recipient: {
+            fullName: `${surname} ${name} ${patronymic}`.trim(),
+            address,
+            zip
+          },
+          total: pricing.total
+        });
+
+        state.cart.clear();
+        state.promo = { value: '', status: 'idle', applied: false };
+
+        closeCheckoutSheet();
+        openSuccessModal();
+        });
+      }
+
+      setupFilterRowDrag();
+    }
+
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.tab = btn.dataset.tab;
+        if (state.tab === 'profile') state.profileScreen = 'main';
+        render();
+      });
+    });
+
+    sortOptions.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-sheet-sort]');
+      if (!target) return;
+      state.pendingSort = target.dataset.sheetSort;
+      renderSortOptions();
+    });
+
+    categoryOptions.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-sheet-cat]');
+      if (!target) return;
+      state.pendingCategory = target.dataset.sheetCat;
+      renderCategoryOptions();
+    });
+
+    sortOverlay.addEventListener('click', closeSortSheet);
+    document.getElementById('cancelSort').addEventListener('click', closeSortSheet);
+    document.getElementById('applySort').addEventListener('click', () => {
+      state.sort = state.pendingSort;
+      closeSortSheet();
+      render();
+    });
+
+    categoryOverlay.addEventListener('click', closeCategorySheet);
+    document.getElementById('cancelCategories').addEventListener('click', closeCategorySheet);
+    document.getElementById('applyCategories').addEventListener('click', () => {
+      state.category = state.pendingCategory;
+      closeCategorySheet();
+      render();
+    });
+
+    checkoutOverlay.addEventListener('click', closeCheckoutSheet);
+    document.getElementById('closeCheckout').addEventListener('click', closeCheckoutSheet);
+
+    successOverlay.addEventListener('click', closeSuccessModal);
+    document.getElementById('closeSuccess').addEventListener('click', closeSuccessModal);
+
+    if (window.Telegram && window.Telegram.WebApp) {
+      const tg = window.Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+      const tgUser = tg.initDataUnsafe?.user;
+      if (tgUser) {
+        state.user.name = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') || 'Telegram User';
+        state.user.username = tgUser.username ? '@' + tgUser.username : 'Telegram';
+        state.user.photo = tgUser.photo_url || '';
+      }
+    }
+
+    loadSearchHistory();
+    render();
+  </script>
+</body>
+</html>
